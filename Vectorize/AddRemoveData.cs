@@ -140,7 +140,7 @@ namespace Vectorize
                 categoryId: "C48B4EF4-D352-4CD2-BCB8-CE89B7DFA642",
                 categoryName: "Clothing, Socks",
                 sku: "SO-R999-M",
-                name: "Cosmic Racing Socks, M",
+                name: "Cosmic Racing Socks 123, M",
                 description: "The product called Cosmic Racing Socks 123, M",
                 price: 6.00,
                 tags: new List<Tag>
