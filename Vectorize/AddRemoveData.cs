@@ -141,7 +141,7 @@ namespace Vectorize
                 categoryName: "Clothing, Socks",
                 sku: "SO-R999-M",
                 name: "Cosmic Racing Socks, M",
-                description: "The product called Cosmic Racing Socks, M",
+                description: "The product called Cosmic Racing Socks 123, M",
                 price: 6.00,
                 tags: new List<Tag>
                 {
