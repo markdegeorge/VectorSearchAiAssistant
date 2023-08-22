@@ -7,6 +7,7 @@
         public string? DatabaseName { get; set; }
 
         public string? CollectionName { get; set; }
+        public string? FireflyCollectionName { get; set; }
         public string? MaxVectorSearchResults { get; set; }
 
         public ILogger? Logger { get; set; }

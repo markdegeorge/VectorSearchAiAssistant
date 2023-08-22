@@ -9,6 +9,8 @@ namespace Vectorize.Options
 
         public string? CollectionName { get; set; }
 
+        public string? FireflyCollectionName { get; set; }
+
         public ILogger? Logger { get; set; }
 
     }

@@ -69,6 +69,7 @@ namespace Vectorize
                         connection: mongoOptions.Value?.Connection ?? string.Empty,
                         databaseName: mongoOptions.Value?.DatabaseName ?? string.Empty,
                         collectionName: mongoOptions.Value?.CollectionName ?? string.Empty,
+                        fireflyCollectionName: mongoOptions.Value?.FireflyCollectionName ?? string.Empty,
                         logger: provider.GetRequiredService<ILogger<MongoDb>>()
                     );
                 }

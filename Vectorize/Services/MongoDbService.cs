@@ -13,10 +13,12 @@ namespace Vectorize.Services
         private readonly MongoClient? _client;
         private readonly IMongoDatabase? _database;
         private readonly string? _collectionName;
+        private readonly string? _fireflyCollectionName;
         private readonly IMongoCollection<BsonDocument>? _collection;
+                private readonly IMongoCollection<BsonDocument>? _fireflyCollection;
         private readonly ILogger _logger;
 
-        public MongoDbService(string connection, string databaseName, string collectionName, ILogger logger)
+        public MongoDbService(string connection, string databaseName, string collectionName, string fireflyCollectionName, ILogger logger)
         {
 
             _logger = logger;
@@ -25,8 +27,12 @@ namespace Vectorize.Services
             {
                 _client = new MongoClient(connection);
                 _database = _client.GetDatabase(databaseName);
+                
                 _collectionName = collectionName;
                 _collection = _database.GetCollection<BsonDocument>(_collectionName);
+
+                _fireflyCollectionName = fireflyCollectionName;
+                _fireflyCollection = _database.GetCollection<BsonDocument>(_fireflyCollectionName);
 
                 string vectorIndexName = "vectorSearchIndex";
 
@@ -59,6 +65,56 @@ namespace Vectorize.Services
                 _logger.LogError("MongoDbService Init failure: " + ex.Message);
             }
         }
+
+        public async Task InsertFireflyVector(BsonDocument document, ILogger logger)
+        {
+
+            if (!document.Contains("_id"))
+            {
+                logger.LogError("Document does not contain _id.");
+                throw new ArgumentException("Document does not contain _id.");
+            }
+
+            string? _idValue = document.GetValue("_id").ToString();
+
+            try
+            {
+                var filter = Builders<BsonDocument>.Filter.Eq("_id", _idValue);
+                var options = new ReplaceOptions { IsUpsert = true };
+                await _collection.ReplaceOneAsync(filter, document, options);
+
+                logger.LogInformation("Inserted new vector into MongoDB");
+            }
+            catch (Exception ex)
+            {
+                //TODO: fix the logger. Output does not show up anywhere
+                logger.LogError($"Exception: InsertVector(): {ex.Message}");
+                throw;
+            }
+
+        }
+
+        public async Task DeleteFireflyVector(string categoryId, string id, ILogger logger)
+        {
+
+            try
+            {
+
+                var filter = Builders<BsonDocument>.Filter.And(
+                    Builders<BsonDocument>.Filter.Eq("categoryId", categoryId),
+                    Builders<BsonDocument>.Filter.Eq("_id", id));
+
+                await _collection.DeleteOneAsync(filter);
+
+            }
+            catch (MongoException ex) 
+            {
+                logger.LogError($"Exception: DeleteVector(): {ex.Message}");
+                throw;
+
+            }
+        }
+
 
         
         public async Task InsertVector(BsonDocument document, ILogger logger)
