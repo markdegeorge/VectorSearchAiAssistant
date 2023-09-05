@@ -1,0 +1,9 @@
+{
+    "azureFunctions.deploySubpath": "Vectorize/bin/Release/net6.0/publish",
+    "azureFunctions.projectLanguage": "C#",
+    "azureFunctions.projectRuntime": "~4",
+    "debug.internalConsoleOptions": "neverOpen",
+    "azureFunctions.preDeployTask": "publish (functions)",
+    "appService.defaultWebAppToDeploy": "/subscriptions/7a800312-7953-492d-a079-afd3498b9450/resourceGroups/VectorSearchAssistantDemo/providers/Microsoft.Web/sites/vector-web",
+    "appService.deploySubpath": "."
+}

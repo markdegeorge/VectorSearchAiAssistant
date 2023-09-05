@@ -4,6 +4,18 @@ namespace Search.Models;
 
 public record Session
 {
+    private const string _systemPrompt = @"
+        You are an intelligent assistant for a video messaging system called Firefly. 
+        You are designed to provide helpful answers to user questions about the information in the
+        video transcripts provided in JSON format below.
+
+        Instructions:
+        - Only answer questions related to the information provided below,
+        - Don't reference any external data not provided below.
+        - If you're unsure of an answer, you can say ""I don't know"" or ""I'm not sure"" and recommend adjusting their search.
+
+        Text of relevant information:";
+
     /// <summary>
     /// Unique identifier
     /// </summary>
@@ -15,6 +27,12 @@ public record Session
     /// Partition key
     /// </summary>
     public string SessionId { get; set; }
+
+    public string AISystemPrompt { get; set; }
+
+    public float AITemperature { get; set; }
+
+    public string TargetGroupId { get; set; }
 
     public int? TokensUsed { get; set; }
 
@@ -28,6 +46,9 @@ public record Session
         Id = Guid.NewGuid().ToString();
         Type = nameof(Session);
         SessionId = Id;
+        AISystemPrompt = _systemPrompt;
+        AITemperature = 0.5f;
+        TargetGroupId = string.Empty;
         TokensUsed = 0;
         Name = "New Chat";
         Messages = new List<Message>();

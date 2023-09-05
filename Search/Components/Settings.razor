@@ -1,0 +1,81 @@
+﻿<style>
+    .modal-dialog {
+        max-width: 100%;
+        width: 50vw;
+        height: 50vh;
+    }
+    .modal-body textarea {
+        width: 100%;
+        height: calc(50vh - 150px); /* adjust as necessary */
+    }
+
+    .modal-body input {
+        width: 100%;
+    }
+</style>
+<div class="modal fade show d-block bg-dark bg-opacity-75" id="myModal" aria-modal="true" role="dialog">
+    <div class="modal-dialog bg-dark">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">@Caption</h4>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="@Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <textarea class="form-control bg-light text-dark" @bind="@SystemPrompt"></textarea>
+                <div>
+                    <div>
+                        <label for="temperatureRange">Temperature: <output id="output">@Temperature</output></label>
+                    </div>
+                    <input type="range" class="form-control-range" id="temperatureRange" @bind="@Temperature" min="0" max="1" step="0.01" @oninput="UpdateTemperature" />
+                </div>
+            </div>
+            <div class="modal-footer">                
+                <button type="button" class="btn btn-primary"
+                @onclick=@Ok>
+                    Save
+                </button>
+                <button type="button" class="btn btn-secondary"
+                @onclick="@Cancel">
+                    Don't Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public AISettings Value { get; set; }
+    [Parameter] public EventCallback<AISettings> OnClose { get; set; }
+
+    private string SystemPrompt { get; set; }
+    private float Temperature { get; set; }
+
+    protected override void OnInitialized()
+    {
+        SystemPrompt = Value.SystemPrompt;
+        Temperature = Value.Temperature;
+    }
+
+    private void UpdateTemperature(ChangeEventArgs e)
+    {
+        Temperature = float.Parse(e.Value.ToString());
+    }
+
+    private Task Cancel()
+    {
+        return OnClose.InvokeAsync(null);
+    }
+    private Task Ok()
+    {
+        return OnClose.InvokeAsync(new AISettings { SystemPrompt = SystemPrompt, Temperature = Temperature });
+    }
+
+    public Task Enter(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            return OnClose.InvokeAsync(new AISettings { SystemPrompt = SystemPrompt, Temperature = Temperature });
+        }
+        return Task.CompletedTask;
+    }
+}

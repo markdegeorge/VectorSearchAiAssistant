@@ -216,7 +216,7 @@
 
     private async Task SubmitPromptAsync()
     {
-        if (CurrentSession?.SessionId == Interface.EMPTY_SESSION || UserPrompt == String.Empty || UserPrompt is null)
+        if (CurrentSession?.SessionId == Interface.EMPTY_SESSION || String.IsNullOrWhiteSpace(UserPrompt) || String.IsNullOrWhiteSpace(CurrentSession?.TargetGroupId))
         {
             return;
         }
@@ -226,7 +226,7 @@
             UserPromptSet = String.Empty;
         }
 
-        await chatService.GetChatCompletionAsync(CurrentSession?.SessionId, UserPrompt);
+        await chatService.GetFireflyChatCompletionAsync(CurrentSession?.SessionId, UserPrompt, CurrentSession?.TargetGroupId, CurrentSession?.AISystemPrompt, CurrentSession?.AITemperature);
 
         if(_messagesInChat?.Count == 2)
         {

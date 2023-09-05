@@ -95,6 +95,20 @@ public class ChatService
     }
 
     /// <summary>
+    /// Rename the Chat Ssssion from "New Chat" to the summary provided by OpenAI
+    /// </summary>
+    public async Task UpdateChatSessionTargetGroupAsync(string? sessionId, string targetGroupId)
+    {
+        ArgumentNullException.ThrowIfNull(sessionId);
+
+        int index = _sessions.FindIndex(s => s.SessionId == sessionId);
+
+        _sessions[index].TargetGroupId = targetGroupId;
+
+        await _cosmosDbService.UpdateSessionAsync(_sessions[index]);
+    }
+
+    /// <summary>
     /// User deletes a chat session
     /// </summary>
     public async Task DeleteChatSessionAsync(string? sessionId)
@@ -142,6 +156,47 @@ public class ChatService
         //Add to prompt and completion to cache, then persist in Cosmos as transaction 
         Message promptMessage = new Message(sessionId, nameof(Participants.User), promptTokens, userPrompt);
         Message completionMessage = new Message(sessionId, nameof(Participants.Assistant), responseTokens, completion);        
+        await AddPromptCompletionMessagesAsync(sessionId, promptMessage, completionMessage);
+
+
+        return completion;
+    }
+
+    /// <summary>
+    /// Receive a prompt from a user, Vectorize it from _openAIService Get a completion from _openAiService
+    /// </summary>
+    public async Task<string> GetFireflyChatCompletionAsync(string? sessionId, string userPrompt, string? targetGroupId, string? systemPrompt, float? temperture)
+    {
+        ArgumentNullException.ThrowIfNull(sessionId);
+        ArgumentNullException.ThrowIfNull(targetGroupId);
+
+        //Retrieve conversation, including latest prompt.
+        //If you put this after the vector search it doesn't take advantage of previous information given so harder to chain prompts together.
+        //However if you put this before the vector search it can get stuck on previous answers and not pull additional information. Worth experimenting
+        //string conversation = GetChatSessionConversation(sessionId, userPrompt);
+
+
+        //Get embeddings for user prompt.
+        (float[] promptVectors, int vectorTokens) = await _openAiService.GetEmbeddingsAsync(sessionId, userPrompt);
+
+
+
+        //Do vector search on prompt embeddings, return list of documents
+        string retrievedDocuments = await _mongoDbService.FireflyVectorSearchAsync(targetGroupId, promptVectors);
+
+
+        //Retrieve conversation, including latest prompt.
+        string conversation = GetChatSessionConversation(sessionId, userPrompt);
+
+
+
+        //Generate the completion to return to the user
+        (string completion, int promptTokens, int responseTokens) = await _openAiService.GetChatCompletionAsync(sessionId, conversation, retrievedDocuments, systemPrompt, temperture);
+
+
+        //Add to prompt and completion to cache, then persist in Cosmos as transaction 
+        Message promptMessage = new Message(sessionId, nameof(Participants.User), promptTokens, userPrompt);
+        Message completionMessage = new Message(sessionId, nameof(Participants.Assistant), responseTokens, completion);
         await AddPromptCompletionMessagesAsync(sessionId, promptMessage, completionMessage);
 
 
@@ -236,5 +291,20 @@ public class ChatService
 
         await _cosmosDbService.UpsertSessionBatchAsync(promptMessage, completionMessage, _sessions[index]);
 
+    }
+
+    /// <summary>
+    /// Save settings for OpenAI
+    /// </summary>
+    public async Task SaveSettingsAsync(string? sessionId, string systemPrompt, float temperature)
+    {
+        ArgumentNullException.ThrowIfNull(sessionId);
+
+        int index = _sessions.FindIndex(s => s.SessionId == sessionId);
+
+        _sessions[index].AISystemPrompt = systemPrompt;
+        _sessions[index].AITemperature = temperature;
+
+        await _cosmosDbService.UpdateSessionAsync(_sessions[index]);
     }
 }

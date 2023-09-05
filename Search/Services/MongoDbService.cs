@@ -3,6 +3,7 @@
     using MongoDB.Bson;
     using MongoDB.Driver;
     using Search.Models;
+    using System.Collections;
     using System.Text.Json;
 
     /// <summary>
@@ -12,8 +13,8 @@
     {
         private readonly MongoClient _client;
         private readonly IMongoDatabase _database;
-        private readonly IMongoCollection<BsonDocument> _collection;
-        private readonly IMongoCollection<BsonDocument> _fireflyCollection;
+        private readonly IMongoCollection<BsonDocument> _vectorDataCollection;
+        private readonly string _vectorSearchCollectionPrefix;
         private readonly int _maxVectorSearchResults = default;
         private readonly ILogger _logger;
 
@@ -28,20 +29,20 @@
         /// <remarks>
         /// This constructor will validate credentials and create a service client instance.
         /// </remarks>
-        public MongoDbService(string connection, string databaseName, string collectionName, string fireflyCollectionName, string maxVectorSearchResults, ILogger logger)
+        public MongoDbService(string connection, string databaseName, string vectorDataCollectionName, string vectorSearchCollectionPrefix, string maxVectorSearchResults, ILogger logger)
         {
             ArgumentException.ThrowIfNullOrEmpty(connection);
             ArgumentException.ThrowIfNullOrEmpty(databaseName);
-            ArgumentException.ThrowIfNullOrEmpty(collectionName);
-            ArgumentException.ThrowIfNullOrEmpty(fireflyCollectionName);
+            ArgumentException.ThrowIfNullOrEmpty(vectorDataCollectionName);
+            ArgumentException.ThrowIfNullOrEmpty(vectorSearchCollectionPrefix);
             ArgumentException.ThrowIfNullOrEmpty(maxVectorSearchResults);
 
             _logger = logger;
 
             _client = new MongoClient(connection);
             _database = _client.GetDatabase(databaseName);
-            _collection = _database.GetCollection<BsonDocument>(collectionName);
-            _fireflyCollection = _database.GetCollection<BsonDocument>(fireflyCollectionName);
+            _vectorDataCollection = _database.GetCollection<BsonDocument>(vectorDataCollectionName);
+            _vectorSearchCollectionPrefix = vectorSearchCollectionPrefix;
             _maxVectorSearchResults = int.TryParse(maxVectorSearchResults, out _maxVectorSearchResults) ? _maxVectorSearchResults: 10;
         }
 
@@ -51,8 +52,8 @@
 
             string resultDocuments = string.Empty;
 
-            try 
-            { 
+            try
+            {
                 //Search Mongo vCore collection for similar embeddings
                 //Project the fields that are needed
                 BsonDocument[] pipeline = new BsonDocument[]
@@ -62,7 +63,8 @@
                 };
 
                 // Combine the results into a single string
-                List<BsonDocument> result = await _collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+                var collection = _database.GetCollection<BsonDocument>("vectors");
+                List<BsonDocument> result = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
                 resultDocuments = string.Join(Environment.NewLine + "-", result.Select(x => x.ToJson()));
 
             }
@@ -70,30 +72,42 @@
             {
                 _logger.LogError(ex.Message);
             }
-            
+
             return resultDocuments;
         }
 
-        public async Task<string> FireflyVectorSearchAsync(float[] embeddings)
+        public async Task<string> FireflyVectorSearchAsync(string targetGroupId, float[] embeddings)
         {
+            ArgumentException.ThrowIfNullOrEmpty(targetGroupId);
+
             List<string> retDocs = new List<string>();
 
-            string resultDocuments = string.Empty;
+            var resultDocuments = string.Empty;
 
             try 
-            { 
+            {
+                var collectionName = GetCollectionName(targetGroupId);
+
+                // Get the collection
+                var collection = _database.GetCollection<BsonDocument>(collectionName);
+
+                if (collection == null)
+                {
+                    _logger.LogError($"Collection {collectionName} not found.");
+                    return resultDocuments;
+                }
+
                 //Search Mongo vCore collection for similar embeddings
                 //Project the fields that are needed
                 BsonDocument[] pipeline = new BsonDocument[]
                 {
                     BsonDocument.Parse($"{{$search: {{cosmosSearch: {{ vector: [{string.Join(',', embeddings)}], path: 'vector', k: {_maxVectorSearchResults}}}, returnStoredSource:true}}}}"),
-                    BsonDocument.Parse($"{{$project: {{_id: 0, vector: 0}}}}"),
+                    BsonDocument.Parse($"{{$project: {{vectorType: 1, vectorText: 1}}}}"),
                 };
 
                 // Combine the results into a single string
-                List<BsonDocument> result = await _fireflyCollection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+                List<BsonDocument> result = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
                 resultDocuments = string.Join(Environment.NewLine + "-", result.Select(x => x.ToJson()));
-
             }
             catch (Exception ex)
             {
@@ -102,5 +116,10 @@
             
             return resultDocuments;
         }
+        private string GetCollectionName(string targetId)
+        {
+            return $"{_vectorSearchCollectionPrefix}-{targetId}";
+        }
+
     }
 }

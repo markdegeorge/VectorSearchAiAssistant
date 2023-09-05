@@ -2,13 +2,15 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet",
-    "CosmosDBConnection": "",
-    "MongoDb__Connection": "",
+    "CosmosDBConnection": "AccountEndpoint=https://vector-cosmos-nosql.documents.azure.com:443/;AccountKey=JV8TTqiU91reXjMqvaLvNyK2zOypfBbrKd6zkYsF03PR6XKG32KhIziyqkZcKFDkFK38su2rnz85ACDbO0Lneg==;",
+    "FireflyDBConnection": "AccountEndpoint=https://murphydev-cosmosdb.documents.azure.com:443/;AccountKey=4WQP9w5ECxCVbupLc2zlX62DXMvjOVVZ1wBBtavA5nrUOTdPAMFgsECkCDdB5wZj2n36VSoQlm9e5g1oS2CvlA==;",
+    "MongoDb__Connection": "mongodb+srv://murphymongo:Rambo!23@vector-mongo.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000",
     "MongoDb__DatabaseName": "vectordb",
-    "MongoDb__CollectionName": "vectors",
-    "OpenAi__Endpoint": "",
-    "OpenAi__Key": "",
-    "OpenAi__EmbeddingsDeployment": "",
+    "MongoDb__VectorDataCollectionName": "firefly-vector-data",
+    "MongoDb__VectorSearchCollectionPrefix": "firefly-vector-search",
+    "OpenAi__Endpoint": "https://vector-openai.openai.azure.com/",
+    "OpenAi__Key": "7031ac52433f458591e68896805d6f23",
+    "OpenAi__EmbeddingsDeployment": "embeddings",
     "OpenAi__MaxTokens": "8191"
   },
   "IsEncrypted": false

@@ -94,8 +94,8 @@ static class ProgramExtensions
                 return new MongoDbService(
                     connection: mongoDbOptions.Value?.Connection?? String.Empty,
                     databaseName: mongoDbOptions.Value?.DatabaseName ?? String.Empty,
-                    collectionName: mongoDbOptions.Value?.CollectionName ?? String.Empty,
-                    fireflyCollectionName: mongoDbOptions.Value?.FireflyCollectionName ?? String.Empty,
+                    vectorDataCollectionName: mongoDbOptions.Value?.VectorDataCollectionName ?? String.Empty,
+                    vectorSearchCollectionPrefix: mongoDbOptions.Value?.VectorSearchCollectionPrefix ?? String.Empty,
                     maxVectorSearchResults: mongoDbOptions.Value?.MaxVectorSearchResults ?? String.Empty,
                     logger: provider.GetRequiredService<ILogger<MongoDbService>>()
                 );
