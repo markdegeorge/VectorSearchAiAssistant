@@ -46,37 +46,7 @@
             _maxVectorSearchResults = int.TryParse(maxVectorSearchResults, out _maxVectorSearchResults) ? _maxVectorSearchResults: 10;
         }
 
-        public async Task<string> VectorSearchAsync(float[] embeddings)
-        {
-            List<string> retDocs = new List<string>();
-
-            string resultDocuments = string.Empty;
-
-            try
-            {
-                //Search Mongo vCore collection for similar embeddings
-                //Project the fields that are needed
-                BsonDocument[] pipeline = new BsonDocument[]
-                {
-                    BsonDocument.Parse($"{{$search: {{cosmosSearch: {{ vector: [{string.Join(',', embeddings)}], path: 'vector', k: {_maxVectorSearchResults}}}, returnStoredSource:true}}}}"),
-                    BsonDocument.Parse($"{{$project: {{_id: 0, vector: 0}}}}"),
-                };
-
-                // Combine the results into a single string
-                var collection = _database.GetCollection<BsonDocument>("vectors");
-                List<BsonDocument> result = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
-                resultDocuments = string.Join(Environment.NewLine + "-", result.Select(x => x.ToJson()));
-
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message);
-            }
-
-            return resultDocuments;
-        }
-
-        public async Task<string> FireflyVectorSearchAsync(string targetGroupId, float[] embeddings)
+        public async Task<string> VectorSearchAsync(string targetGroupId, float[] embeddings)
         {
             ArgumentException.ThrowIfNullOrEmpty(targetGroupId);
 
@@ -115,6 +85,36 @@
             }
             
             return resultDocuments;
+        }
+
+        public async Task<List<MessageTarget>> GetVectorSearchTargetsAsync()
+        {
+            var targets = new List<MessageTarget>();
+
+            try
+            {
+                var messageTargets = await _vectorDataCollection.Aggregate()
+                    .Unwind("messageTargets")
+                    .Unwind("messageTargets.targets")
+                    .Group(new BsonDocument
+                    {
+                        { "_id", "$messageTargets.targets._id" },
+                        { "name", new BsonDocument("$first", "$messageTargets.targets.name") }
+                    })
+                    .ToListAsync();
+
+                targets = messageTargets.Where(t => t["_id"] != BsonNull.Value).Select(t => new MessageTarget
+                {
+                    Id = t["_id"].AsString,
+                    Name = t["name"].AsString
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+
+            return targets;
         }
         private string GetCollectionName(string targetId)
         {

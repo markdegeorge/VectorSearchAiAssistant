@@ -9,7 +9,12 @@ public class ChatService
     /// <summary>
     /// All data is cached in the _sessions List object.
     /// </summary>
+    /// 
+
+    public string SelectedUser { get; set; } 
+    
     private static List<Session> _sessions = new();
+    private static List<MessageTarget> _availableMessageTargets = new();
 
     private readonly CosmosDbService _cosmosDbService;
     private readonly OpenAiService _openAiService;
@@ -27,11 +32,19 @@ public class ChatService
     }
 
     /// <summary>
+    /// Returns list of target ids and names for left-hand nav to bind to
+    /// </summary>
+    public async Task<List<MessageTarget>> GetAvailableTargetsAsync()
+    {
+        return _availableMessageTargets = await _mongoDbService.GetVectorSearchTargetsAsync();
+    }
+
+    /// <summary>
     /// Returns list of chat session ids and names for left-hand nav to bind to (display Name and ChatSessionId as hidden)
     /// </summary>
     public async Task<List<Session>> GetAllChatSessionsAsync()
     {
-        return _sessions = await _cosmosDbService.GetSessionsAsync();
+        return _sessions = await _cosmosDbService.GetSessionsAsync(SelectedUser);
     }
 
     /// <summary>
@@ -70,9 +83,9 @@ public class ChatService
     /// <summary>
     /// User creates a new Chat Session.
     /// </summary>
-    public async Task CreateNewChatSessionAsync()
+    public async Task CreateNewChatSessionAsync(string userId)
     {
-        Session session = new();
+        Session session = new(userId);
 
         _sessions.Add(session);
 
@@ -109,6 +122,18 @@ public class ChatService
     }
 
     /// <summary>
+    /// Delete user prompts in the chat session message list object and also delete in the data service.
+    /// </summary>
+    public async Task DeleteChatMessagesAsync(string sessionId)
+    {
+        int index = _sessions.FindIndex(s => s.SessionId == sessionId);
+
+        _sessions[index].DeleteMessages();
+
+        await _cosmosDbService.DeleteMessagesAsync(sessionId);
+    }
+
+    /// <summary>
     /// User deletes a chat session
     /// </summary>
     public async Task DeleteChatSessionAsync(string? sessionId)
@@ -125,47 +150,7 @@ public class ChatService
     /// <summary>
     /// Receive a prompt from a user, Vectorize it from _openAIService Get a completion from _openAiService
     /// </summary>
-    public async Task<string> GetChatCompletionAsync(string? sessionId, string userPrompt)
-    {
-        ArgumentNullException.ThrowIfNull(sessionId);
-
-        //Retrieve conversation, including latest prompt.
-        //If you put this after the vector search it doesn't take advantage of previous information given so harder to chain prompts together.
-        //However if you put this before the vector search it can get stuck on previous answers and not pull additional information. Worth experimenting
-        //string conversation = GetChatSessionConversation(sessionId, userPrompt);
-
-
-        //Get embeddings for user prompt.
-        (float[] promptVectors, int vectorTokens) = await _openAiService.GetEmbeddingsAsync(sessionId, userPrompt);
-
-
-
-        //Do vector search on prompt embeddings, return list of documents
-        string retrievedDocuments = await _mongoDbService.VectorSearchAsync(promptVectors);
-
-
-        //Retrieve conversation, including latest prompt.
-        string conversation = GetChatSessionConversation(sessionId, userPrompt);
-
-
-
-        //Generate the completion to return to the user
-        (string completion, int promptTokens, int responseTokens) = await _openAiService.GetChatCompletionAsync(sessionId, conversation, retrievedDocuments);
-
-
-        //Add to prompt and completion to cache, then persist in Cosmos as transaction 
-        Message promptMessage = new Message(sessionId, nameof(Participants.User), promptTokens, userPrompt);
-        Message completionMessage = new Message(sessionId, nameof(Participants.Assistant), responseTokens, completion);        
-        await AddPromptCompletionMessagesAsync(sessionId, promptMessage, completionMessage);
-
-
-        return completion;
-    }
-
-    /// <summary>
-    /// Receive a prompt from a user, Vectorize it from _openAIService Get a completion from _openAiService
-    /// </summary>
-    public async Task<string> GetFireflyChatCompletionAsync(string? sessionId, string userPrompt, string? targetGroupId, string? systemPrompt, float? temperture)
+    public async Task<string> ChatCompletionAsync(string? sessionId, string userPrompt, string? targetGroupId, string? systemPrompt, float? temperture)
     {
         ArgumentNullException.ThrowIfNull(sessionId);
         ArgumentNullException.ThrowIfNull(targetGroupId);
@@ -182,7 +167,7 @@ public class ChatService
 
 
         //Do vector search on prompt embeddings, return list of documents
-        string retrievedDocuments = await _mongoDbService.FireflyVectorSearchAsync(targetGroupId, promptVectors);
+        string retrievedDocuments = await _mongoDbService.VectorSearchAsync(targetGroupId, promptVectors);
 
 
         //Retrieve conversation, including latest prompt.

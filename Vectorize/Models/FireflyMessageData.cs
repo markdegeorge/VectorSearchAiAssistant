@@ -17,6 +17,12 @@ namespace Vectorize.Models
     public class MessageTargets
     {
         public string messageId { get; set; }
-        public List<string> targetIds { get; set; }
+        public List<MessageTarget> targets { get; set; }
+    }
+
+    public class MessageTarget
+    {
+        public string id { get; set; }
+        public string name { get; set; }
     }
 }

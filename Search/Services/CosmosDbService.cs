@@ -71,10 +71,11 @@ public class CosmosDbService
     /// Gets a list of all current chat sessions.
     /// </summary>
     /// <returns>List of distinct chat session items.</returns>
-    public async Task<List<Session>> GetSessionsAsync()
+    public async Task<List<Session>> GetSessionsAsync(string userId)
     {
-        QueryDefinition query = new QueryDefinition("SELECT DISTINCT * FROM c WHERE c.type = @type")
-            .WithParameter("@type", nameof(Session));
+        QueryDefinition query = new QueryDefinition("SELECT DISTINCT * FROM c WHERE c.type = @type AND c.userId = @userId")
+            .WithParameter("@type", nameof(Session))
+            .WithParameter("@userId", userId);
 
         FeedIterator<Session> response = _completions.GetItemQueryIterator<Session>(query);
 
@@ -185,6 +186,35 @@ public class CosmosDbService
         // TODO: await container.DeleteAllItemsByPartitionKeyStreamAsync(partitionKey);
 
         QueryDefinition query = new QueryDefinition("SELECT c.id FROM c WHERE c.sessionId = @sessionId")
+                .WithParameter("@sessionId", sessionId);
+
+        FeedIterator<Message> response = _completions.GetItemQueryIterator<Message>(query);
+
+        TransactionalBatch batch = _completions.CreateTransactionalBatch(partitionKey);
+        while (response.HasMoreResults)
+        {
+            FeedResponse<Message> results = await response.ReadNextAsync();
+            foreach (var item in results)
+            {
+                batch.DeleteItem(
+                    id: item.Id
+                );
+            }
+        }
+        await batch.ExecuteAsync();
+    }
+
+    /// <summary>
+    /// Batch deletes all related messages to the session.
+    /// </summary>
+    /// <param name="sessionId">Chat session identifier used to flag messages for deletion.</param>
+    public async Task DeleteMessagesAsync(string sessionId)
+    {
+        PartitionKey partitionKey = new(sessionId);
+
+        // TODO: await container.DeleteAllItemsByPartitionKeyStreamAsync(partitionKey);
+
+        QueryDefinition query = new QueryDefinition("SELECT c.id FROM c WHERE c.sessionId = @sessionId AND c.type = 'Message'")
                 .WithParameter("@sessionId", sessionId);
 
         FeedIterator<Message> response = _completions.GetItemQueryIterator<Message>(query);

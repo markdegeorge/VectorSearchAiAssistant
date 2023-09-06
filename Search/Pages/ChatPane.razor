@@ -3,6 +3,7 @@
 @using Humanizer
 @inject ChatService chatService
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavManager
 
 <div class="h-100 mh-100 d-flex flex-column overflow-hidden justify-content-start">
     @if (ShowHeader)
@@ -30,7 +31,10 @@
             </div>
         </div>
     } 
-    <h6 class="px-4 display-6 text-secondary p-2">@GetChatSessionName()</h6>
+    <div class="d-flex justify-content-between align-items-center px-4">
+        <h6 class="px-4 display-6 text-secondary p-2">@GetChatSessionName()</h6>
+        <UserSelector SelectedUser="@chatService.SelectedUser" OnUserChanged="HandleUserChanged" />
+    </div>
     <div class="px-4 pb-4 pt-2 flex-grow-1 overflow-y-auto overflow-x-hidden align-items-stretch" id="MessagesInChatdiv">
         @if (CurrentSession is null)
         {
@@ -150,6 +154,8 @@
 	[Parameter]
     public EventCallback OnNavBarVisibilityUpdated { get; set; }
 
+    private string currentUser;
+
     private string? UserPrompt { get; set; }
 
     private string? UserPromptSet { get; set; }
@@ -226,7 +232,7 @@
             UserPromptSet = String.Empty;
         }
 
-        await chatService.GetFireflyChatCompletionAsync(CurrentSession?.SessionId, UserPrompt, CurrentSession?.TargetGroupId, CurrentSession?.AISystemPrompt, CurrentSession?.AITemperature);
+        await chatService.ChatCompletionAsync(CurrentSession?.SessionId, UserPrompt, CurrentSession?.TargetGroupId, CurrentSession?.AISystemPrompt, CurrentSession?.AITemperature);
 
         if(_messagesInChat?.Count == 2)
         {
@@ -266,5 +272,14 @@
     private async Task ScrollLastChatToView()
     {
         await JSRuntime.InvokeAsync<bool>("scrollToLastMessage");
+    }
+
+    private void HandleUserChanged(string selectedUser)
+    {
+        chatService.SelectedUser = selectedUser;
+
+        // Update other components, if required, based on the selected user.
+        NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+
     }
 }

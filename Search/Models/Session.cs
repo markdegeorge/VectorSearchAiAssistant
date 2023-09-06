@@ -23,6 +23,8 @@ public record Session
 
     public string Type { get; set; }
 
+    public string UserId { get; set; }
+
     /// <summary>
     /// Partition key
     /// </summary>
@@ -41,10 +43,11 @@ public record Session
     [JsonIgnore]
     public List<Message> Messages { get; set; }
 
-    public Session()
+    public Session(string userId)
     {
         Id = Guid.NewGuid().ToString();
         Type = nameof(Session);
+        UserId = userId;
         SessionId = Id;
         AISystemPrompt = _systemPrompt;
         AITemperature = 0.5f;
@@ -64,5 +67,9 @@ public record Session
         var match = Messages.Single(m => m.Id == message.Id);
         var index = Messages.IndexOf(match);
         Messages[index] = message;
+    }
+    public void DeleteMessages()
+    {
+        Messages.Clear();
     }
 }

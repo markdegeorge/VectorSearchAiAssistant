@@ -1,7 +1,7 @@
 ﻿@using Search.Constants
 @using Search.Services
 @inject ChatService chatService
-
+@inject IJSRuntime JSRuntime
 
 <div class="h-100 d-flex flex-column" style="min-width: 275px;">
 
@@ -59,8 +59,10 @@
                                             <label for="options" class="form-label @((string.IsNullOrEmpty(session.TargetGroupId)) ? "text-danger" : "")">Select a target group</label>
                                             <select id="options" class="form-control" value="@session.TargetGroupId" @onchange="OnTargetGroupIdChange">
                                                 <option value=""></option>
-                                                <option value="d604573c-1a66-4532-8ef7-366211a5b6b6">Training</option>
-                                                <option value="df421bad-ab41-44d5-a7ac-5e3095b3919f">Tech Internal</option>
+                                                @foreach (var target in _messageTargets)
+                                                {
+                                                    <option value="@target.Id">@target.Name</option>
+                                                }
                                             </select>
                                         </div>
 
@@ -80,6 +82,9 @@
                                             </button>
                                             <button type="button" class="btn btn-sm btn-link text-light" @onclick="@(e => OpenSettings(session.SessionId,session.Name))">
                                                 <i class="bi bi-gear-fill me-1"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-link text-light" @onclick="@(e => OpenMessages(session.SessionId,session.Name))">
+                                                <i class="bi bi-folder-x ms-1"></i>
                                             </button>
                                             <button type="button" class="btn btn-sm btn-link text-light" @onclick="@(e => OpenConfirmation(session.SessionId,session.Name))">
                                                 <i class="bi bi-trash-fill ms-1"></i>
@@ -106,6 +111,16 @@
         Type="Confirmation.Category.DeleteNot">
     </Confirmation>
 }
+
+@if (_deleteMessagesPopUpOpen)
+{
+    <Confirmation Caption="Delete messages in a Chat"
+                  Message="@_popUpText"
+                  OnClose="@OnDeleteMessagesClose"
+                  Type="Confirmation.Category.DeleteNot">
+    </Confirmation>
+}
+
 
 
 @if (_renamePopUpOpen)
@@ -140,11 +155,14 @@
 
     private string? _sessionId;
     private string? _popUpText;
+    private List<MessageTarget> _messageTargets = new List<MessageTarget>();
     private bool _deletePopUpOpen = false;
+    private bool _deleteMessagesPopUpOpen = false;
     private bool _loadingComplete;
     private bool _renamePopUpOpen = false;
     private bool _settingsPopUpOpen = false;
     private AISettings _settings;
+
 
     public Session? CurrentSession;
 
@@ -160,7 +178,7 @@
         await OnThemeUpdated.InvokeAsync();
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         OnNavMenuChanged += async (o, e) =>
         {
@@ -170,6 +188,15 @@
                 await LoadCurrentChatAsync();
             });
         };
+
+        _messageTargets = await chatService.GetAvailableTargetsAsync();
+
+        var retrievedUser = await JSRuntime.InvokeAsync<string>("blazorExtensions.retrieveUserSelection");
+
+        if (!string.IsNullOrWhiteSpace(retrievedUser))
+        {
+            chatService.SelectedUser = retrievedUser; 
+        }
     }
 
     private void OpenConfirmation(string id, string title)
@@ -177,6 +204,13 @@
         _deletePopUpOpen = true;
         _sessionId = id;
         _popUpText = $"Do you want to delete the chat \"{title}\"?";
+    }
+
+    private void OpenMessages(string id, string title)
+    {
+        _deleteMessagesPopUpOpen = true;
+        _sessionId = id;
+        _popUpText = $"Do you want to delete the chat messages for \"{title}\"?";
     }
 
     public void UpdateNavMenuDisplay(string reason = "")
@@ -206,7 +240,7 @@
             if (!updateCurrentChat)
                 return;
 
-            CurrentSession = new Session();
+            CurrentSession = new Session(chatService.SelectedUser);
             CurrentSession.SessionId = Interface.EMPTY_SESSION;
             CurrentSession.Name = string.Empty;
             CurrentSession.TargetGroupId = string.Empty;    
@@ -231,6 +265,50 @@
         _deletePopUpOpen = false;
     }
 
+    private async Task OnDeleteMessagesClose(bool isOk)
+    {
+        bool updateCurrentChat = false;
+
+        if (CurrentSession is not null & _sessionId == CurrentSession?.SessionId)
+            updateCurrentChat = true;
+
+        if (isOk)
+        {
+            _deleteMessagesPopUpOpen = false;
+            await chatService.DeleteChatMessagesAsync(_sessionId);
+
+            UpdateNavMenuDisplay("Delete");
+
+            if (!updateCurrentChat)
+                return;
+
+            if (CurrentSession != null)
+                CurrentSession.Messages = new List<Message>();
+
+            //CurrentSession = new Session();
+            //CurrentSession.SessionId = Interface.EMPTY_SESSION;
+            //CurrentSession.Name = string.Empty;
+            //CurrentSession.TargetGroupId = string.Empty;
+
+            //if (ChatSessions is not null & ChatSessions?.Count > 0)
+            //{
+            //    var match = ChatSessions?.FirstOrDefault();
+            //    if (match is not null)
+            //    {
+            //        CurrentSession.SessionId = match.SessionId;
+            //        CurrentSession.Name = match.Name;
+            //        CurrentSession.TargetGroupId = match.TargetGroupId;
+            //        CurrentSession.TokensUsed = match.TokensUsed;
+            //        CurrentSession.AISystemPrompt = match.AISystemPrompt;
+            //        CurrentSession.AITemperature = match.AITemperature;
+            //    }
+            //}
+
+            //await LoadCurrentChatAsync();
+        }
+
+        _deleteMessagesPopUpOpen = false;
+    }
     private void OpenInput(string id, string title)
     {
         _renamePopUpOpen = true;
@@ -240,6 +318,12 @@
 
     private void OpenSettings(string id, string title)
     {
+        // Make sure the id is the same as the current session
+        if (id != CurrentSession?.SessionId)
+        {
+            return;
+        }
+
         _settingsPopUpOpen = true;
         _sessionId = id;
         _popUpText = title;
@@ -305,7 +389,7 @@
 
     private async Task NewChat()
     {
-        await chatService.CreateNewChatSessionAsync();
+        await chatService.CreateNewChatSessionAsync(chatService.SelectedUser);
 
         if (ChatSessions.Count == 1)
         {
@@ -352,7 +436,7 @@
         }
         if (CurrentSession is null || index < 0)
         {
-            CurrentSession = new Session();
+            CurrentSession = new Session(chatService.SelectedUser);
             CurrentSession.SessionId = Interface.EMPTY_SESSION;
             CurrentSession.Name = string.Empty;
             CurrentSession.TargetGroupId = string.Empty;
@@ -382,7 +466,7 @@
         if (ChatSessions is null) return 0;
 
         if (CurrentSession is null)
-           CurrentSession = new Session();
+           CurrentSession = new Session(chatService.SelectedUser);
 
         CurrentSession.SessionId = _sessionId;
         CurrentSession.Name = sessionName;

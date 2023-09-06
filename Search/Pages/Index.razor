@@ -1,10 +1,20 @@
 ﻿@page "/"
 
+<style>
+    .navmenu-container {
+        width: 350px; /* or whatever width you prefer */
+        flex-shrink: 0; /* This ensures the container doesn't shrink */
+    }
+
+</style>
+
 <PageTitle>Azure Cosmos DB & Azure OpenAI</PageTitle>
 <main class="h-100 d-flex flex-row justify-content-start">
     @if (!IsNavMenuCollapsed)
     {
-        <NavMenu @ref="@NavMenu" OnChatClicked="LoadChatEventHandlerAsync" OnNavBarVisibilityUpdated="UpdateNavBarVisibility" />
+        <div class="navmenu-container">
+            <NavMenu @ref="@NavMenu" OnChatClicked="LoadChatEventHandlerAsync" OnNavBarVisibilityUpdated="UpdateNavBarVisibility" />
+        </div>
     }
     <section class="flex-grow-1">
         <ChatPane @ref="@ChatPane" CurrentSession="@CurrentSession" OnChatUpdated="ForceRefreshAsync" OnNavBarVisibilityUpdated="UpdateNavBarVisibility" ShowHeader="@IsNavMenuCollapsed" />
@@ -52,4 +62,5 @@
 
         NavMenu?.UpdateNavMenuDisplay("Rename by Open AI");
     }
+
 }

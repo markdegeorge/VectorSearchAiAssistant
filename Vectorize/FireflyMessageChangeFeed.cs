@@ -73,6 +73,8 @@ namespace Vectorize
 
             try
             {
+                var Testmode = true;
+
                 // Get the transcript checksum
                 var transcriptChecksum = Checksum.GetChecksum(message.Transcript);
 
@@ -105,11 +107,17 @@ namespace Vectorize
                         logger.LogWarning("Warning: Found message with matching transcript checksum and different message Id. Message Id: " + message.Id);
 
                         // For now, update the existingMessageData to include the new messageTargets so we can see which messages need further processing
-                        var newTargetIds = message.Targets.Where(x => x.Id != null && _validTargetIds.Contains(x.Id)).Select(x => x.Id).ToList();
+                        var newTargets = message.Targets.Where(x => x.Id != null && _validTargetIds.Contains(x.Id))
+                            .Select(x => new BsonDocument
+                            {
+                                { "id", x.Id },
+                                { "name", x.Name }
+                            }).ToList();
+
                         var newMessageTarget = new BsonDocument
                         {
                             { "messageId", message.Id },
-                            { "targetIds", new BsonArray(newTargetIds) }
+                            { "targets", new BsonArray(newTargets) }
                         };
 
                         existingMessageData["messageTargets"].AsBsonArray.Add(newMessageTarget);
@@ -127,12 +135,12 @@ namespace Vectorize
                 };
 
                 // Retrieve the valid targets from the document
-                var targetIds = message.Targets.Where(x => x.Id != null && _validTargetIds.Contains(x.Id)).Select(x => x.Id).ToList();
+                var targets = message.Targets.Where(x => x.Id != null && _validTargetIds.Contains(x.Id)).Select(x => new MessageTarget { id = x.Id, name = x.Name }).ToList();
                 messageData.messageTargets = new List<MessageTargets>()
                 {
                     new MessageTargets
                     {
-                        messageId = message.Id, targetIds = targetIds
+                        messageId = message.Id, targets = targets
                     }
                 };
 
@@ -149,6 +157,7 @@ namespace Vectorize
                     messageId = message.Id,
                 }; 
 
+                var targetIds = targets.Select(x => x.id).ToList();
                 // Delete any existing vectors for this message id if they exist
                 await _mongo.DeleteMessageVectors(message.Id, targetIds, logger);
 
@@ -198,8 +207,15 @@ namespace Vectorize
                     //vector.vector = new float[1536];
 
                     //Get the embeddings from OpenAI
-                    vector.vector = await _openAI.GetEmbeddingsAsync(vector.vectorText, logger);
-                    //vector.vector = await _openAI.GetEmbeddingsAsync($"{{ video transcript: \"{vector.vectorText}\" }}", logger);
+                    if (Testmode)
+                    {
+                        vector.vector = new float[1536];
+                    }
+                    else
+                    {
+                        vector.vector = await _openAI.GetEmbeddingsAsync(vector.vectorText, logger);
+                        //vector.vector = await _openAI.GetEmbeddingsAsync($"{{ video transcript: \"{vector.vectorText}\" }}", logger);
+                    }
 
                     //Save to Mongo
                     BsonDocument document = vector.ToBsonDocument();
